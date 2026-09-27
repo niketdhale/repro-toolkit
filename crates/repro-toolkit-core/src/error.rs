@@ -41,6 +41,23 @@ pub enum ReproError {
 
     #[error("failed to serialize repro sequence to JSON: {0}")]
     Serialize(#[from] serde_json::Error),
+
+    #[error("failed to read custom sequence file at {path}: {source}")]
+    ReadCustomSequence {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("failed to parse custom sequence JSON in {path}: {source}")]
+    ParseCustomSequence {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+
+    #[error("custom sequence in {path} has no steps")]
+    EmptyCustomSequence { path: PathBuf },
 }
 
 pub type Result<T> = std::result::Result<T, ReproError>;

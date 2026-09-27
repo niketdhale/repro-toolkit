@@ -19,6 +19,10 @@ enum Command {
         /// Write JSON to this file instead of stdout.
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// Use this custom sequence JSON file instead of auto-generating
+        /// the sequence from the PDX. See docs/custom-sequence-guide.md.
+        #[arg(short, long)]
+        sequence: Option<PathBuf>,
     },
 }
 
@@ -26,7 +30,11 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Parse { input, output } => match run_parse(&input, output.as_deref()) {
+        Command::Parse {
+            input,
+            output,
+            sequence,
+        } => match run_parse(&input, output.as_deref(), sequence.as_deref()) {
             Ok(()) => ExitCode::SUCCESS,
             Err(message) => {
                 eprintln!("error: {message}");
@@ -36,8 +44,13 @@ fn main() -> ExitCode {
     }
 }
 
-fn run_parse(input: &std::path::Path, output: Option<&std::path::Path>) -> Result<(), String> {
-    let sequence = repro_toolkit_core::parse_pdx_file(input).map_err(|e| e.to_string())?;
+fn run_parse(
+    input: &std::path::Path,
+    output: Option<&std::path::Path>,
+    sequence: Option<&std::path::Path>,
+) -> Result<(), String> {
+    let sequence =
+        repro_toolkit_core::generate_sequence(input, sequence).map_err(|e| e.to_string())?;
     let json = repro_toolkit_core::to_json_string(&sequence).map_err(|e| e.to_string())?;
 
     match output {
