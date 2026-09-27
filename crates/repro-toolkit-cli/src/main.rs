@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use repro_toolkit_core::Severity;
 
 #[derive(Parser)]
 #[command(name = "repro-toolkit", version, about = "Automotive ECU reprogramming toolkit")]
@@ -24,6 +25,16 @@ enum Command {
         #[arg(short, long)]
         sequence: Option<PathBuf>,
     },
+    /// Validate a PDX's (or custom sequence's) repro sequence and report
+    /// any issues, without printing the sequence itself.
+    Validate {
+        /// Path to the input .pdx file.
+        input: PathBuf,
+        /// Validate this custom sequence JSON file instead of the
+        /// auto-generated one. See docs/custom-sequence-guide.md.
+        #[arg(short, long)]
+        sequence: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -41,6 +52,7 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Command::Validate { input, sequence } => run_validate(&input, sequence.as_deref()),
     }
 }
 
@@ -59,4 +71,34 @@ fn run_parse(
     }
 
     Ok(())
+}
+
+fn run_validate(input: &std::path::Path, sequence: Option<&std::path::Path>) -> ExitCode {
+    let sequence = match repro_toolkit_core::generate_sequence(input, sequence) {
+        Ok(sequence) => sequence,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let issues = repro_toolkit_core::validate_sequence(&sequence);
+    if issues.is_empty() {
+        println!("OK: {} step(s), no issues found", sequence.step_count);
+        return ExitCode::SUCCESS;
+    }
+
+    let mut has_error = false;
+    for issue in &issues {
+        if issue.severity == Severity::Error {
+            has_error = true;
+        }
+        println!("{issue}");
+    }
+
+    if has_error {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

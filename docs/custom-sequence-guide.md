@@ -12,6 +12,8 @@ default, PDX-derived sequence.
 - FFI (C#/Python/C++): `repro_toolkit_generate_sequence(pdx_path, sequence_path)` — pass `NULL`/`nullptr` for `sequence_path` to get the default behavior.
 
 A worked example lives at [`samples/custom-sequence.example.json`](../samples/custom-sequence.example.json).
+Once you've written one, check it with the linter — see
+[Validation](#validation) below.
 
 ## Why a full sequence instead of a diff/overlay
 
@@ -141,6 +143,8 @@ repro-toolkit parse ecu.pdx --sequence default-sequence.json
 
 ## Validation
 
+### At load time
+
 The loader rejects:
 - a file with zero steps,
 - an unrecognized `category` value (must be one of the values listed above, or omitted),
@@ -148,3 +152,37 @@ The loader rejects:
 
 Errors name the file path and the underlying JSON error to make fixing a
 malformed sequence file straightforward.
+
+### The sequence linter
+
+Passing load-time validation only means the file is well-formed JSON in
+the right shape — it doesn't catch problems in the sequence's *content*.
+Run the linter separately (it also runs against the default,
+auto-generated sequence, in case a PDX itself produces something odd):
+
+```
+repro-toolkit validate ecu.pdx --sequence my-sequence.json
+```
+
+It reports two severities:
+
+- **`error`** — something that will very likely break a real flashing
+  tool or ECU exchange:
+  - a `kind: "fixed"` field whose `value_hex` isn't a non-empty,
+    even-length hex string,
+  - two fields in the same request/response whose
+    `[byte_position, byte_position + ceil(bit_length / 8))` ranges overlap.
+- **`warning`** — worth a second look, but not rejected, since you're in
+  full control of a custom sequence's content and order:
+  - a step whose `category` is one of the known UDS categories (anything
+    but `OTHER`) but has no `request` at all,
+  - known categories appearing out of their usual UDS flash order (e.g. a
+    `TRANSFER_DATA` step before the sequence's `REQUEST_DOWNLOAD` step).
+    Only checked among categories you actually used — omitting a category
+    entirely (e.g. no security access at all) is never flagged.
+
+The CLI exits non-zero only if at least one `error`-severity issue was
+found; warnings alone exit `0`. The same checks are available from the
+library (`repro_toolkit_core::validate_sequence`) and over FFI
+(`repro_toolkit_validate_sequence`), returning the same issues as
+structured data instead of printed lines.

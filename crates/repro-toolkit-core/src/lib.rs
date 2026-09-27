@@ -13,12 +13,14 @@ mod error;
 mod odx;
 mod pdx;
 mod sequence;
+mod validate;
 
 use std::path::Path;
 
 pub use custom::{CustomSequenceInput, CustomStepInput};
 pub use error::{ReproError, Result};
 pub use sequence::{FieldKind, FieldSpec, MessageSpec, ReproSequence, SequenceStep, StepCategory};
+pub use validate::{validate_sequence, Severity, ValidationIssue};
 
 /// Parse a PDX file on disk and build its UDS reprogramming sequence.
 pub fn parse_pdx_file<P: AsRef<Path>>(path: P) -> Result<ReproSequence> {
@@ -294,6 +296,15 @@ mod tests {
             writer.finish().unwrap();
         }
         buf
+    }
+
+    #[test]
+    fn default_sequence_validates_clean() {
+        let sequence = parse_pdx_bytes(build_sample_pdx()).expect("should parse sample PDX");
+        assert!(
+            validate_sequence(&sequence).is_empty(),
+            "auto-generated default sequence should never trip the validator"
+        );
     }
 
     #[test]

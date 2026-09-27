@@ -18,6 +18,17 @@ static void print_sequence(const char *label, const char *pdx_path, const char *
     repro_toolkit_free_string(json);
 }
 
+static void print_validation(const char *label, const char *pdx_path, const char *sequence_path) {
+    char *json = repro_toolkit_validate_sequence(pdx_path, sequence_path);
+    if (json == NULL) {
+        fprintf(stderr, "%s: pdx_path was NULL\n", label);
+        return;
+    }
+
+    printf("=== validate: %s ===\n%s\n\n", label, json);
+    repro_toolkit_free_string(json);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: %s <ecu.pdx> [custom-sequence.json]\n", argv[0]);
@@ -29,10 +40,12 @@ int main(int argc, char **argv) {
 
     /* Default, auto-generated sequence. */
     print_sequence("default sequence", pdx_path, NULL);
+    print_validation("default sequence", pdx_path, NULL);
 
     /* Custom sequence, if one was given on the command line. */
     if (sequence_path != NULL) {
         print_sequence("custom sequence", pdx_path, sequence_path);
+        print_validation("custom sequence", pdx_path, sequence_path);
     }
 
     return 0;

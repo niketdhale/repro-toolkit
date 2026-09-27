@@ -183,6 +183,11 @@ mod tests {
             .find(|s| s.name == "VendorPreFlashSelfTest")
             .expect("sample should contain the spliced-in vendor step");
         assert_eq!(vendor_step.category, StepCategory::Other);
+
+        assert!(
+            crate::validate_sequence(&sequence).is_empty(),
+            "samples/custom-sequence.example.json should never trip the validator"
+        );
     }
 
     #[test]

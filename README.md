@@ -38,6 +38,7 @@ repro-toolkit/
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx -o sequence.json
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx --sequence my-custom-sequence.json
+cargo run -p repro-toolkit-cli -- validate path/to/ecu.pdx --sequence my-custom-sequence.json
 ```
 
 ## Library usage (Rust)
@@ -51,6 +52,9 @@ let sequence = repro_toolkit_core::parse_pdx_file("ecu.pdx")?;
 let sequence = repro_toolkit_core::generate_sequence("ecu.pdx", Some("my-custom-sequence.json"))?;
 
 let json = repro_toolkit_core::to_json_string(&sequence)?;
+
+// Check a sequence for problems before using it (see "Validation" below):
+let issues = repro_toolkit_core::validate_sequence(&sequence);
 ```
 
 ## FFI usage (any language)
@@ -63,19 +67,23 @@ cargo build --release -p repro-toolkit-ffi
 # -> target/release/repro_toolkit_ffi.dll     (Windows)
 ```
 
-Contract: three exported functions.
+Contract: four exported functions.
 
 ```c
 char* repro_toolkit_parse_pdx(const char* path); // NUL-terminated UTF-8 JSON, or NULL if path is NULL
 char* repro_toolkit_generate_sequence(const char* pdx_path, const char* sequence_path); // sequence_path may be NULL
+char* repro_toolkit_validate_sequence(const char* pdx_path, const char* sequence_path); // sequence_path may be NULL
 void  repro_toolkit_free_string(char* ptr);      // must be called on every non-null string returned above
 ```
 
-The returned JSON is always one of:
+The returned JSON is one of:
 ```json
 {"ok": true, "sequence": { ... }}
+{"ok": true, "valid": true, "issues": []}
+{"ok": true, "valid": false, "issues": [{"severity": "error", "step_index": 2, "message": "..."}]}
 {"ok": false, "error": "..."}
 ```
+(`repro_toolkit_validate_sequence` returns the `"valid"`/`"issues"` shape; the other two functions return `"sequence"`.)
 
 Example from C#:
 
@@ -176,6 +184,19 @@ for the full schema and recipes, and
 **[samples/custom-sequence.example.json](samples/custom-sequence.example.json)**
 for a complete worked example (the standard flash sequence with an extra
 vendor self-test step spliced in).
+
+## Validation
+
+`repro-toolkit validate <pdx> [--sequence <file>]` (also
+`validate_sequence()` in the library, and `repro_toolkit_validate_sequence`
+over FFI) lints a sequence — default or custom — for problems that are
+valid JSON but still wrong: overlapping byte positions within one
+message, invalid hex on a fixed field, a known UDS step with no request
+at all, or known steps in the wrong order. Errors mean the sequence
+shouldn't be used as-is; warnings are a heads-up, since a custom
+sequence's order and content are fully under your control. See
+[Validation in the custom sequence guide](docs/custom-sequence-guide.md#validation)
+for the full list of checks.
 
 ## Scope and limitations
 
