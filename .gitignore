@@ -1,1 +1,7 @@
 /target
+examples/rust/target
+examples/c/main
+examples/cpp/main
+examples/csharp/**/bin
+examples/csharp/**/obj
+__pycache__/

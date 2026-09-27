@@ -1,0 +1,16 @@
+[workspace]
+# Standalone package: deliberately outside the repro-toolkit workspace so
+# it has its own Cargo.lock and doesn't need to be listed as a member.
+
+[package]
+name = "repro-toolkit-example"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "example"
+path = "src/main.rs"
+
+[dependencies]
+repro-toolkit-core = { path = "../../crates/repro-toolkit-core" }

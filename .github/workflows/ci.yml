@@ -25,3 +25,14 @@ jobs:
         run: cargo test --workspace --verbose
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Build FFI library (for the C/C++/Python examples)
+        run: cargo build --release -p repro-toolkit-ffi
+      - name: Run C example
+        run: make -C examples/c run
+      - name: Run C++ example
+        run: make -C examples/cpp run
+      - name: Run Python example
+        run: |
+          python3 examples/python/example.py samples/sample.pdx samples/custom-sequence.example.json
+      - name: Run Rust example
+        run: cargo run --release --manifest-path examples/rust/Cargo.toml -- samples/sample.pdx samples/custom-sequence.example.json
