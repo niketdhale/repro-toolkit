@@ -3,6 +3,7 @@
 [![CI](https://github.com/niketdhale/repro-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/niketdhale/repro-toolkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2021-orange.svg)](https://www.rust-lang.org)
+[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](CHANGELOG.md)
 
 A cross-platform, multi-language library and CLI for automotive ECU
 reprogramming. It parses a **PDX** archive (the ZIP-packaged ODX
@@ -29,8 +30,11 @@ repro-toolkit/
     repro-toolkit-cli/    # binary: `repro-toolkit parse <file.pdx>`
   examples/               # one example per language: C, C++, Python, C#, Rust
   samples/                # sample.pdx and a worked custom-sequence.example.json
-  docs/                   # custom-sequence-guide.md
+  docs/                   # architecture.md, custom-sequence-guide.md
 ```
+
+For an overview of how the code fits together, see
+[docs/architecture.md](docs/architecture.md).
 
 ## CLI usage
 
@@ -228,3 +232,13 @@ cargo clippy --workspace --all-targets
 
 All three commands are known to run clean in this repository's CI/dev
 environment (Rust toolchain via `cargo`/`rustc`, no extra setup needed).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md),
+and [SECURITY.md](SECURITY.md) for how to report vulnerabilities. Release notes are in
+[CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
