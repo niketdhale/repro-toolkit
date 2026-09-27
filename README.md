@@ -1,5 +1,9 @@
 # repro-toolkit
 
+[![CI](https://github.com/niketdhale/repro-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/niketdhale/repro-toolkit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-2021-orange.svg)](https://www.rust-lang.org)
+
 A cross-platform, multi-language library and CLI for automotive ECU
 reprogramming. It parses a **PDX** archive (the ZIP-packaged ODX
 diagnostic data format defined by ISO 22901) and generates the ordered
