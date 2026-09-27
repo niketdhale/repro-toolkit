@@ -80,12 +80,22 @@ Example from C#:
 [DllImport("repro_toolkit_ffi")]
 static extern IntPtr repro_toolkit_parse_pdx(string path);
 
+// sequencePath may be null to fall back to the default, PDX-derived sequence.
+[DllImport("repro_toolkit_ffi")]
+static extern IntPtr repro_toolkit_generate_sequence(string pdxPath, string? sequencePath);
+
 [DllImport("repro_toolkit_ffi")]
 static extern void repro_toolkit_free_string(IntPtr ptr);
 
+// Default sequence:
 IntPtr ptr = repro_toolkit_parse_pdx("ecu.pdx");
 string json = Marshal.PtrToStringUTF8(ptr);
 repro_toolkit_free_string(ptr);
+
+// Custom sequence (see docs/custom-sequence-guide.md):
+IntPtr customPtr = repro_toolkit_generate_sequence("ecu.pdx", "my-custom-sequence.json");
+string customJson = Marshal.PtrToStringUTF8(customPtr);
+repro_toolkit_free_string(customPtr);
 ```
 
 Example from Python:
@@ -94,9 +104,17 @@ Example from Python:
 import ctypes
 lib = ctypes.CDLL("./librepro_toolkit_ffi.so")
 lib.repro_toolkit_parse_pdx.restype = ctypes.c_void_p
+lib.repro_toolkit_generate_sequence.restype = ctypes.c_void_p
+
+# Default sequence:
 ptr = lib.repro_toolkit_parse_pdx(b"ecu.pdx")
 json_str = ctypes.cast(ptr, ctypes.c_char_p).value.decode("utf-8")
 lib.repro_toolkit_free_string(ptr)
+
+# Custom sequence (pass None/nullptr for sequence_path to get default behavior):
+custom_ptr = lib.repro_toolkit_generate_sequence(b"ecu.pdx", b"my-custom-sequence.json")
+custom_json = ctypes.cast(custom_ptr, ctypes.c_char_p).value.decode("utf-8")
+lib.repro_toolkit_free_string(custom_ptr)
 ```
 
 ## Output shape
