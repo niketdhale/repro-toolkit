@@ -39,6 +39,9 @@ pub enum ReproError {
     #[error("no diagnostic layer with services was found in the ODX data")]
     NoServicesFound,
 
+    #[error("max_block_length must be at least 3 (SID + block sequence counter + 1 data byte), got {0}")]
+    InvalidMaxBlockLength(u32),
+
     #[error("failed to serialize repro sequence to JSON: {0}")]
     Serialize(#[from] serde_json::Error),
 

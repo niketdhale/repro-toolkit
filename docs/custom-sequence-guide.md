@@ -112,6 +112,7 @@ seed, an address, a data payload):
 | `bit_length`    | both              | No        | Bit width, if known/relevant.                        |
 | `kind`          | both              | Yes       | `"fixed"` or `"variable"`.                           |
 | `value_hex`     | `kind: "fixed"`   | Yes       | Uppercase or lowercase hex, no `0x` prefix, e.g. `"10"`, `"31"`. |
+| `description`   | both              | No        | Free text. If you leave it out on the NRC byte (byte 2) of a negative response, the NRC name is filled in automatically (e.g. `"35"` → `"invalidKey"`). |
 | `data_type`     | `kind: "variable"`| No        | ODX base data type if known (`A_UINT32`, `A_BYTEFIELD`, ...) — purely informational. |
 
 ## Common recipes

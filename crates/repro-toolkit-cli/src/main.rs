@@ -1,8 +1,8 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use repro_toolkit_core::Severity;
+use repro_toolkit_core::{GenerateOptions, Severity, DEFAULT_MAX_BLOCK_LENGTH};
 
 #[derive(Parser)]
 #[command(name = "repro-toolkit", version, about = "Automotive ECU reprogramming toolkit")]
@@ -24,6 +24,10 @@ enum Command {
         /// the sequence from the PDX. See docs/custom-sequence-guide.md.
         #[arg(short, long)]
         sequence: Option<PathBuf>,
+        /// TransferData maxNumberOfBlockLength (includes SID + counter
+        /// bytes), decimal or 0x-prefixed hex. Ignored for custom sequences.
+        #[arg(short = 'b', long, value_parser = parse_u32, default_value_t = DEFAULT_MAX_BLOCK_LENGTH)]
+        max_block_length: u32,
     },
     /// Validate a PDX's (or custom sequence's) repro sequence and report
     /// any issues, without printing the sequence itself.
@@ -34,7 +38,18 @@ enum Command {
         /// auto-generated one. See docs/custom-sequence-guide.md.
         #[arg(short, long)]
         sequence: Option<PathBuf>,
+        /// TransferData maxNumberOfBlockLength, as for `parse`.
+        #[arg(short = 'b', long, value_parser = parse_u32, default_value_t = DEFAULT_MAX_BLOCK_LENGTH)]
+        max_block_length: u32,
     },
+}
+
+fn parse_u32(s: &str) -> Result<u32, String> {
+    let result = match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        Some(hex) => u32::from_str_radix(hex, 16),
+        None => s.parse(),
+    };
+    result.map_err(|e| format!("invalid number '{s}': {e}"))
 }
 
 fn main() -> ExitCode {
@@ -45,24 +60,33 @@ fn main() -> ExitCode {
             input,
             output,
             sequence,
-        } => match run_parse(&input, output.as_deref(), sequence.as_deref()) {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(message) => {
-                eprintln!("error: {message}");
-                ExitCode::FAILURE
+            max_block_length,
+        } => {
+            let options = GenerateOptions { max_block_length };
+            match run_parse(&input, output.as_deref(), sequence.as_deref(), &options) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(message) => {
+                    eprintln!("error: {message}");
+                    ExitCode::FAILURE
+                }
             }
-        },
-        Command::Validate { input, sequence } => run_validate(&input, sequence.as_deref()),
+        }
+        Command::Validate {
+            input,
+            sequence,
+            max_block_length,
+        } => run_validate(&input, sequence.as_deref(), &GenerateOptions { max_block_length }),
     }
 }
 
 fn run_parse(
-    input: &std::path::Path,
-    output: Option<&std::path::Path>,
-    sequence: Option<&std::path::Path>,
+    input: &Path,
+    output: Option<&Path>,
+    sequence: Option<&Path>,
+    options: &GenerateOptions,
 ) -> Result<(), String> {
-    let sequence =
-        repro_toolkit_core::generate_sequence(input, sequence).map_err(|e| e.to_string())?;
+    let sequence = repro_toolkit_core::generate_sequence_with_options(input, sequence, options)
+        .map_err(|e| e.to_string())?;
     let json = repro_toolkit_core::to_json_string(&sequence).map_err(|e| e.to_string())?;
 
     match output {
@@ -73,14 +97,15 @@ fn run_parse(
     Ok(())
 }
 
-fn run_validate(input: &std::path::Path, sequence: Option<&std::path::Path>) -> ExitCode {
-    let sequence = match repro_toolkit_core::generate_sequence(input, sequence) {
-        Ok(sequence) => sequence,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return ExitCode::FAILURE;
-        }
-    };
+fn run_validate(input: &Path, sequence: Option<&Path>, options: &GenerateOptions) -> ExitCode {
+    let sequence =
+        match repro_toolkit_core::generate_sequence_with_options(input, sequence, options) {
+            Ok(sequence) => sequence,
+            Err(e) => {
+                eprintln!("error: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
 
     let issues = repro_toolkit_core::validate_sequence(&sequence);
     if issues.is_empty() {

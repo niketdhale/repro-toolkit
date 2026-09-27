@@ -43,26 +43,33 @@ pub unsafe extern "C" fn repro_toolkit_generate_sequence(
     pdx_path: *const c_char,
     sequence_path: *const c_char,
 ) -> *mut c_char {
+    repro_toolkit_generate_sequence_ex(pdx_path, sequence_path, 0)
+}
+
+/// Like [`repro_toolkit_generate_sequence`], with an explicit TransferData
+/// `max_block_length` (UDS maxNumberOfBlockLength, including the SID and
+/// block sequence counter bytes). Pass 0 for the library default (0x0FFF).
+/// Ignored when `sequence_path` is non-NULL.
+///
+/// # Safety
+/// Same requirements as [`repro_toolkit_generate_sequence`].
+#[no_mangle]
+pub unsafe extern "C" fn repro_toolkit_generate_sequence_ex(
+    pdx_path: *const c_char,
+    sequence_path: *const c_char,
+    max_block_length: u32,
+) -> *mut c_char {
     if pdx_path.is_null() {
         return std::ptr::null_mut();
     }
-
-    let pdx_path_str = match CStr::from_ptr(pdx_path).to_str() {
-        Ok(s) => s,
-        Err(_) => return to_c_string(&error_json("pdx_path is not valid UTF-8")),
+    let (pdx, seq) = match read_paths(pdx_path, sequence_path) {
+        Ok(paths) => paths,
+        Err(json) => return to_c_string(&json),
     };
 
-    let sequence_path_str = if sequence_path.is_null() {
-        None
-    } else {
-        match CStr::from_ptr(sequence_path).to_str() {
-            Ok(s) => Some(s),
-            Err(_) => return to_c_string(&error_json("sequence_path is not valid UTF-8")),
-        }
-    };
-
+    let options = options_from(max_block_length);
     let result_json =
-        match repro_toolkit_core::generate_sequence(pdx_path_str, sequence_path_str) {
+        match repro_toolkit_core::generate_sequence_with_options(pdx, seq, &options) {
             Ok(sequence) => match repro_toolkit_core::to_json_string(&sequence) {
                 Ok(json) => format!("{{\"ok\":true,\"sequence\":{json}}}"),
                 Err(e) => error_json(&e.to_string()),
@@ -89,25 +96,31 @@ pub unsafe extern "C" fn repro_toolkit_validate_sequence(
     pdx_path: *const c_char,
     sequence_path: *const c_char,
 ) -> *mut c_char {
+    repro_toolkit_validate_sequence_ex(pdx_path, sequence_path, 0)
+}
+
+/// Like [`repro_toolkit_validate_sequence`], with an explicit
+/// `max_block_length` as in [`repro_toolkit_generate_sequence_ex`] (0 for
+/// the default).
+///
+/// # Safety
+/// Same requirements as [`repro_toolkit_generate_sequence`].
+#[no_mangle]
+pub unsafe extern "C" fn repro_toolkit_validate_sequence_ex(
+    pdx_path: *const c_char,
+    sequence_path: *const c_char,
+    max_block_length: u32,
+) -> *mut c_char {
     if pdx_path.is_null() {
         return std::ptr::null_mut();
     }
-
-    let pdx_path_str = match CStr::from_ptr(pdx_path).to_str() {
-        Ok(s) => s,
-        Err(_) => return to_c_string(&error_json("pdx_path is not valid UTF-8")),
+    let (pdx, seq) = match read_paths(pdx_path, sequence_path) {
+        Ok(paths) => paths,
+        Err(json) => return to_c_string(&json),
     };
 
-    let sequence_path_str = if sequence_path.is_null() {
-        None
-    } else {
-        match CStr::from_ptr(sequence_path).to_str() {
-            Ok(s) => Some(s),
-            Err(_) => return to_c_string(&error_json("sequence_path is not valid UTF-8")),
-        }
-    };
-
-    let result_json = match repro_toolkit_core::generate_sequence(pdx_path_str, sequence_path_str)
+    let options = options_from(max_block_length);
+    let result_json = match repro_toolkit_core::generate_sequence_with_options(pdx, seq, &options)
     {
         Ok(sequence) => {
             let issues = repro_toolkit_core::validate_sequence(&sequence);
@@ -138,6 +151,39 @@ pub unsafe extern "C" fn repro_toolkit_validate_sequence(
 pub unsafe extern "C" fn repro_toolkit_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         drop(CString::from_raw(ptr));
+    }
+}
+
+/// Reads the (non-NULL) PDX path and optional sequence path, or returns
+/// the error JSON to hand back to the caller.
+///
+/// # Safety
+/// `pdx_path` must be non-NULL; both must be valid NUL-terminated strings
+/// when non-NULL.
+unsafe fn read_paths<'a>(
+    pdx_path: *const c_char,
+    sequence_path: *const c_char,
+) -> Result<(&'a str, Option<&'a str>), String> {
+    let pdx = CStr::from_ptr(pdx_path)
+        .to_str()
+        .map_err(|_| error_json("pdx_path is not valid UTF-8"))?;
+    let seq = if sequence_path.is_null() {
+        None
+    } else {
+        Some(
+            CStr::from_ptr(sequence_path)
+                .to_str()
+                .map_err(|_| error_json("sequence_path is not valid UTF-8"))?,
+        )
+    };
+    Ok((pdx, seq))
+}
+
+fn options_from(max_block_length: u32) -> repro_toolkit_core::GenerateOptions {
+    if max_block_length == 0 {
+        repro_toolkit_core::GenerateOptions::default()
+    } else {
+        repro_toolkit_core::GenerateOptions { max_block_length }
     }
 }
 
@@ -201,6 +247,19 @@ mod tests {
             assert!(!result.is_null());
             let json = CStr::from_ptr(result).to_str().unwrap();
             assert!(json.contains("\"ok\":false"));
+            repro_toolkit_free_string(result);
+        }
+    }
+
+    #[test]
+    fn generate_ex_reports_too_small_block_length() {
+        let pdx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../samples/sample.pdx");
+        let pdx = CString::new(pdx.to_str().unwrap()).unwrap();
+        unsafe {
+            let result = repro_toolkit_generate_sequence_ex(pdx.as_ptr(), std::ptr::null(), 2);
+            let json = CStr::from_ptr(result).to_str().unwrap();
+            assert!(json.contains("\"ok\":false"), "{json}");
+            assert!(json.contains("max_block_length"), "{json}");
             repro_toolkit_free_string(result);
         }
     }

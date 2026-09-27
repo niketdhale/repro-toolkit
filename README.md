@@ -43,6 +43,7 @@ cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx -o sequence.json
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx --sequence my-custom-sequence.json
 cargo run -p repro-toolkit-cli -- validate path/to/ecu.pdx --sequence my-custom-sequence.json
+cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx --max-block-length 0x0802
 ```
 
 ## Library usage (Rust)
@@ -71,12 +72,17 @@ cargo build --release -p repro-toolkit-ffi
 # -> target/release/repro_toolkit_ffi.dll     (Windows)
 ```
 
-Contract: four exported functions.
+Contract: six exported functions. The `_ex` variants of
+`generate_sequence` and `validate_sequence` take an extra
+`uint32_t max_block_length` argument (0 means the default); see
+[TransferData chunking](#transferdata-chunking).
 
 ```c
 char* repro_toolkit_parse_pdx(const char* path); // NUL-terminated UTF-8 JSON, or NULL if path is NULL
 char* repro_toolkit_generate_sequence(const char* pdx_path, const char* sequence_path); // sequence_path may be NULL
 char* repro_toolkit_validate_sequence(const char* pdx_path, const char* sequence_path); // sequence_path may be NULL
+char* repro_toolkit_generate_sequence_ex(const char* pdx_path, const char* sequence_path, uint32_t max_block_length);
+char* repro_toolkit_validate_sequence_ex(const char* pdx_path, const char* sequence_path, uint32_t max_block_length);
 void  repro_toolkit_free_string(char* ptr);      // must be called on every non-null string returned above
 ```
 
@@ -155,17 +161,40 @@ lib.repro_toolkit_free_string(custom_ptr)
 
 Steps are ordered into the canonical UDS flash sequence:
 `SESSION_CONTROL` → `SECURITY_SEED_REQUEST` → `SECURITY_KEY_SEND` →
-`ERASE_MEMORY` → `REQUEST_DOWNLOAD` → `TRANSFER_DATA` (repeated once per
-flash data block found in the PDX's `odx-f` data) →
-`REQUEST_TRANSFER_EXIT` → `CHECK_MEMORY` → `ECU_RESET`. Any diagnostic
-service that doesn't match one of these categories is still included,
-tagged `OTHER`, so nothing from the source ODX is silently dropped.
+`ERASE_MEMORY` → `REQUEST_DOWNLOAD` → `TRANSFER_DATA` (one step per
+chunk, see below) → `REQUEST_TRANSFER_EXIT` → `CHECK_MEMORY` →
+`ECU_RESET`. Any diagnostic service that doesn't match one of these
+categories is still included, tagged `OTHER`, so nothing from the source
+ODX is silently dropped.
+
+### TransferData chunking
+
+Each flash data block from the PDX's `odx-f` data is split into chunks of
+at most `max_block_length` bytes. This is UDS `maxNumberOfBlockLength`,
+which counts the SID and block sequence counter bytes, so each chunk
+carries `max_block_length - 2` bytes of data. The default is `0x0FFF`.
+Set it to the value your ECU reports in its RequestDownload response with
+`--max-block-length` / `-b` on the CLI, `GenerateOptions` in Rust, or the
+`_ex` functions over FFI.
+
+Every chunk is its own `TRANSFER_DATA` step. Its request gets a fixed
+`BlockSequenceCounter` field at byte 1, which starts at `01` and wraps
+from `FF` to `00`. The step's `notes` give the block, chunk number,
+address and length. Custom sequences are never chunked; their steps are
+used exactly as written.
+
+### Fields
 
 Each request/response field is either:
 - `"kind": "fixed"` — a byte value already known from the ODX
   `CODED-CONST` (e.g. the service ID/sub-function), given as hex, or
 - `"kind": "variable"` — a value only known at runtime (a seed, an
   address, a data payload, ...), with its ODX base data type when known.
+
+A field may also have a `description`. The NRC byte (byte 2) of a
+negative response gets the ISO 14229-1 name of its code, e.g.
+`"value_hex": "22"` → `"description": "conditionsNotCorrect"`. In Rust,
+`describe_nrc(code)` returns the same name.
 
 ## Examples
 

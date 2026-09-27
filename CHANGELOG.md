@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- TransferData chunking: flash blocks are split by `max_block_length` (UDS
+  maxNumberOfBlockLength, default `0x0FFF`). Each chunk is its own step with a
+  `BlockSequenceCounter` that wraps from FF to 00. Set it with `--max-block-length`,
+  `GenerateOptions`, or `repro_toolkit_generate_sequence_ex` /
+  `repro_toolkit_validate_sequence_ex`.
+- NRC labels: the NRC byte of a negative response gets a `description` with its
+  ISO 14229-1 name (e.g. `conditionsNotCorrect`). Rust callers can also use
+  `describe_nrc()`.
+
+### Changed
+- The default sequence now has one TransferData step per chunk instead of one per
+  flash block. The sample PDX goes from 8 steps to 32.
+
 ## [0.1.0] - 2026-09-27
 
 ### Added

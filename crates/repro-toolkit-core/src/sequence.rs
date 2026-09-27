@@ -65,8 +65,35 @@ pub struct FieldSpec {
     pub byte_position: Option<u32>,
     #[serde(default)]
     pub bit_length: Option<u32>,
+    /// Human-readable meaning of the value, e.g. the NRC name on a
+    /// negative response's NRC byte.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(flatten)]
     pub kind: FieldKind,
+}
+
+/// Default `maxNumberOfBlockLength` used to chunk TransferData when the
+/// caller doesn't supply one.
+pub const DEFAULT_MAX_BLOCK_LENGTH: u32 = 0x0FFF;
+
+/// Options for building the default, PDX-derived sequence.
+#[derive(Debug, Clone, Copy)]
+pub struct GenerateOptions {
+    /// UDS `maxNumberOfBlockLength`: the size of a whole TransferData
+    /// request, including the SID and block sequence counter bytes. Each
+    /// chunk therefore carries `max_block_length - 2` bytes of data. The
+    /// ECU reports the real value in its RequestDownload response. Must be
+    /// at least 3.
+    pub max_block_length: u32,
+}
+
+impl Default for GenerateOptions {
+    fn default() -> Self {
+        Self {
+            max_block_length: DEFAULT_MAX_BLOCK_LENGTH,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +114,13 @@ pub enum FieldKind {
 pub fn build_sequence(
     layers: &[DiagLayer],
     flash_blocks: &[FlashDataBlock],
+    options: &GenerateOptions,
 ) -> Result<ReproSequence> {
+    if options.max_block_length < 3 {
+        return Err(ReproError::InvalidMaxBlockLength(options.max_block_length));
+    }
+    let chunk_payload = u64::from(options.max_block_length - 2);
+
     let layer = layers
         .iter()
         .find(|l| !l.services.is_empty())
@@ -105,21 +138,36 @@ pub fn build_sequence(
     let mut steps = Vec::new();
     for (category, svc) in classified {
         if category == StepCategory::TransferData && !flash_blocks.is_empty() {
-            for (i, block) in flash_blocks.iter().enumerate() {
-                steps.push(build_step(
-                    steps.len(),
-                    category,
-                    svc,
-                    Some(format!(
-                        "block {}/{} '{}': address=0x{:X} size=0x{:X} ({} bytes)",
-                        i + 1,
-                        flash_blocks.len(),
-                        block.short_name,
-                        block.address,
-                        block.size,
-                        block.size
-                    )),
-                ));
+            // ISO 14229: the counter starts at 0x01 after RequestDownload
+            // and wraps from 0xFF to 0x00.
+            let mut counter: u8 = 0x01;
+            for (block_i, block) in flash_blocks.iter().enumerate() {
+                let chunk_count = block.size.div_ceil(chunk_payload).max(1);
+                for chunk_i in 0..chunk_count {
+                    let offset = chunk_i * chunk_payload;
+                    let len = chunk_payload.min(block.size - offset);
+                    let mut step = build_step(
+                        steps.len(),
+                        category,
+                        svc,
+                        Some(format!(
+                            "block {}/{} '{}' chunk {}/{}: address=0x{:X} length={} bytes, blockSequenceCounter=0x{:02X}",
+                            block_i + 1,
+                            flash_blocks.len(),
+                            block.short_name,
+                            chunk_i + 1,
+                            chunk_count,
+                            block.address + offset,
+                            len,
+                            counter
+                        )),
+                    );
+                    if let Some(request) = &mut step.request {
+                        add_block_sequence_counter(request, counter);
+                    }
+                    steps.push(step);
+                    counter = counter.wrapping_add(1);
+                }
             }
         } else {
             steps.push(build_step(steps.len(), category, svc, None));
@@ -146,9 +194,40 @@ fn build_step(
         semantic: svc.semantic.clone(),
         request: svc.request.as_ref().map(to_message_spec),
         expected_positive_responses: svc.pos_responses.iter().map(to_message_spec).collect(),
-        expected_negative_responses: svc.neg_responses.iter().map(to_message_spec).collect(),
+        expected_negative_responses: svc
+            .neg_responses
+            .iter()
+            .map(|m| {
+                let mut spec = to_message_spec(m);
+                crate::nrc::annotate_negative_response(&mut spec);
+                spec
+            })
+            .collect(),
         notes,
     }
+}
+
+/// Puts the block sequence counter at byte 1 of a TransferData request,
+/// unless the ODX already defines a field there.
+fn add_block_sequence_counter(request: &mut MessageSpec, counter: u8) {
+    if request.fields.iter().any(|f| f.byte_position == Some(1)) {
+        return;
+    }
+    let field = FieldSpec {
+        name: "BlockSequenceCounter".to_string(),
+        byte_position: Some(1),
+        bit_length: Some(8),
+        description: None,
+        kind: FieldKind::Fixed {
+            value_hex: format!("{counter:02X}"),
+        },
+    };
+    let insert_at = request
+        .fields
+        .iter()
+        .position(|f| f.byte_position.is_some_and(|p| p > 1))
+        .unwrap_or(request.fields.len());
+    request.fields.insert(insert_at, field);
 }
 
 fn to_message_spec(msg: &Message) -> MessageSpec {
@@ -161,6 +240,7 @@ fn to_message_spec(msg: &Message) -> MessageSpec {
                 name: p.short_name.clone(),
                 byte_position: p.byte_position,
                 bit_length: p.bit_length,
+                description: None,
                 kind: match &p.kind {
                     ParamKind::CodedConst { bytes } => FieldKind::Fixed {
                         value_hex: bytes_to_hex(bytes),

@@ -85,7 +85,14 @@ pub fn load_custom_sequence_file(
             semantic: step.semantic,
             request: step.request,
             expected_positive_responses: step.expected_positive_responses,
-            expected_negative_responses: step.expected_negative_responses,
+            expected_negative_responses: step
+                .expected_negative_responses
+                .into_iter()
+                .map(|mut m| {
+                    crate::nrc::annotate_negative_response(&mut m);
+                    m
+                })
+                .collect(),
             notes: step.notes,
         })
         .collect();

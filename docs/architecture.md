@@ -30,8 +30,9 @@ belong in `repro-toolkit-core`.
      ▼                                   custom.rs   loads and checks the file
  sequence.rs       classifies services         │     (steps are used as written)
                    into StepCategory, orders   │
-                   them, one TransferData      │
-                   step per flash block        │
+                   them, splits flash blocks   │
+                   into TransferData chunks,   │
+                   labels NRCs (nrc.rs)        │
      │                                        │
      └──────────────► ReproSequence ◄──────────┘
                           │
