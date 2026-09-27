@@ -12,6 +12,11 @@ same custom sequence file (`samples/custom-sequence.example.json`).
 | C# | [`csharp/`](csharp) | `repro-toolkit-ffi` (C ABI), via P/Invoke, wrapped in a managed `ReproToolkit.Interop` project |
 | Rust | [`rust/`](rust) | `repro-toolkit-core` directly — no FFI, since it's Rust calling Rust |
 
+The C example additionally calls `repro_toolkit_validate_sequence` (see
+[Validation](../docs/custom-sequence-guide.md#validation)) alongside
+`repro_toolkit_generate_sequence`, printing the linter's output for both
+the default and custom sequence.
+
 ## Prerequisites
 
 All examples except Rust load the native library built from

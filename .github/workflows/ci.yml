@@ -27,6 +27,17 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Build FFI library (for the C/C++/Python examples)
         run: cargo build --release -p repro-toolkit-ffi
+      - name: CLI validate smoke test
+        run: |
+          set -e
+          cargo run --release -p repro-toolkit-cli -- validate samples/sample.pdx
+          cargo run --release -p repro-toolkit-cli -- validate samples/sample.pdx --sequence samples/custom-sequence.example.json
+          # A deliberately invalid sequence must be reported and exit non-zero.
+          echo '{"steps":[{"name":"Bad","request":{"name":"R","fields":[{"name":"SID","kind":"fixed","value_hex":"ZZ"}]}}]}' > /tmp/broken-sequence.json
+          if cargo run --release -p repro-toolkit-cli -- validate samples/sample.pdx --sequence /tmp/broken-sequence.json; then
+            echo "expected validate to exit non-zero on an invalid sequence" >&2
+            exit 1
+          fi
       - name: Run C example
         run: make -C examples/c run
       - name: Run C++ example

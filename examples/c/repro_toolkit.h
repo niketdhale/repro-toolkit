@@ -24,6 +24,13 @@ char *repro_toolkit_parse_pdx(const char *path);
  * Returns NULL only if `pdx_path` itself is NULL. */
 char *repro_toolkit_generate_sequence(const char *pdx_path, const char *sequence_path);
 
+/* Validates the repro sequence for `pdx_path` (optionally overridden by
+ * `sequence_path`, exactly as above) and returns
+ * {"ok": true, "valid": bool, "issues": [...]} as JSON, or the usual
+ * {"ok": false, "error": "..."} on failure. Returns NULL only if
+ * `pdx_path` itself is NULL. */
+char *repro_toolkit_validate_sequence(const char *pdx_path, const char *sequence_path);
+
 /* Frees a string previously returned by any repro_toolkit_* function.
  * Passing NULL is a no-op. */
 void repro_toolkit_free_string(char *ptr);

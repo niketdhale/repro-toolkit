@@ -34,7 +34,7 @@ pub struct SequenceStep {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum StepCategory {
     SessionControl,
@@ -51,14 +51,14 @@ pub enum StepCategory {
     Other,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageSpec {
     pub name: String,
     #[serde(default)]
     pub fields: Vec<FieldSpec>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldSpec {
     pub name: String,
     #[serde(default)]
@@ -69,7 +69,7 @@ pub struct FieldSpec {
     pub kind: FieldKind,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FieldKind {
     Fixed { value_hex: String },
@@ -178,7 +178,7 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02X}")).collect()
 }
 
-fn category_rank(cat: StepCategory) -> u8 {
+pub(crate) fn category_rank(cat: StepCategory) -> u8 {
     match cat {
         StepCategory::SessionControl => 0,
         StepCategory::SecuritySeedRequest => 1,
