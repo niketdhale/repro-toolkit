@@ -8,6 +8,7 @@
 //! # Ok::<(), repro_toolkit_core::ReproError>(())
 //! ```
 
+mod custom;
 mod error;
 mod odx;
 mod pdx;
@@ -15,6 +16,7 @@ mod sequence;
 
 use std::path::Path;
 
+pub use custom::{CustomSequenceInput, CustomStepInput};
 pub use error::{ReproError, Result};
 pub use sequence::{FieldKind, FieldSpec, MessageSpec, ReproSequence, SequenceStep, StepCategory};
 
@@ -29,6 +31,37 @@ pub fn parse_pdx_file<P: AsRef<Path>>(path: P) -> Result<ReproSequence> {
 pub fn parse_pdx_bytes(bytes: Vec<u8>) -> Result<ReproSequence> {
     let contents = pdx::load_pdx_bytes(bytes)?;
     sequence::build_sequence(&contents.diag_layers, &contents.flash_data_blocks)
+}
+
+/// Generate the repro sequence for a PDX file, optionally overridden by a
+/// user-supplied custom sequence JSON file.
+///
+/// - `custom_sequence_path` is `None`: identical to [`parse_pdx_file`] —
+///   the sequence is fully auto-generated from the PDX.
+/// - `custom_sequence_path` is `Some(path)`: `path` is parsed as a
+///   [`CustomSequenceInput`] and used instead of auto-generating steps
+///   from the PDX. The PDX is still opened, only to supply the ECU
+///   variant name when the custom file doesn't set one itself. See
+///   `docs/custom-sequence-guide.md` for the custom sequence JSON schema.
+pub fn generate_sequence<P: AsRef<Path>, Q: AsRef<Path>>(
+    pdx_path: P,
+    custom_sequence_path: Option<Q>,
+) -> Result<ReproSequence> {
+    match custom_sequence_path {
+        None => parse_pdx_file(pdx_path),
+        Some(seq_path) => {
+            let ecu_variant_fallback = pdx::load_pdx_file(pdx_path.as_ref())
+                .ok()
+                .and_then(|contents| {
+                    contents
+                        .diag_layers
+                        .iter()
+                        .find(|l| !l.services.is_empty())
+                        .map(|l| l.short_name.clone())
+                });
+            custom::load_custom_sequence_file(seq_path.as_ref(), ecu_variant_fallback)
+        }
+    }
 }
 
 /// Serialize a repro sequence to a pretty-printed JSON string.
@@ -332,5 +365,65 @@ mod tests {
 
         let err = parse_pdx_bytes(buf).unwrap_err();
         assert!(matches!(err, ReproError::NoDiagLayerContainer));
+    }
+
+    #[test]
+    fn generate_sequence_uses_custom_file_with_ecu_name_from_pdx() {
+        use std::io::Write;
+
+        let pdx_path = {
+            let mut f = tempfile::NamedTempFile::with_suffix(".pdx").unwrap();
+            f.write_all(&build_sample_pdx()).unwrap();
+            f
+        };
+
+        let custom_path = {
+            let mut f = tempfile::NamedTempFile::with_suffix(".json").unwrap();
+            f.write_all(
+                br#"{
+                    "steps": [
+                        {
+                            "name": "CustomWait",
+                            "notes": "vendor-required 500ms settle delay"
+                        },
+                        {
+                            "name": "VendorRoutine",
+                            "request": {
+                                "name": "VendorRoutine_Req",
+                                "fields": [
+                                    { "name": "SID", "kind": "fixed", "value_hex": "31" }
+                                ]
+                            }
+                        }
+                    ]
+                }"#,
+            )
+            .unwrap();
+            f
+        };
+
+        let sequence = generate_sequence(pdx_path.path(), Some(custom_path.path()))
+            .expect("should load custom sequence");
+
+        // ECU name comes from the PDX since the custom file didn't set one.
+        assert_eq!(sequence.ecu_variant, "Sample_ECU");
+        assert_eq!(sequence.step_count, 2);
+        assert_eq!(sequence.steps[0].name, "CustomWait");
+        assert_eq!(sequence.steps[0].category, StepCategory::Other);
+        assert_eq!(sequence.steps[1].name, "VendorRoutine");
+    }
+
+    #[test]
+    fn generate_sequence_without_custom_file_matches_default() {
+        use std::io::Write;
+        let pdx_path = {
+            let mut f = tempfile::NamedTempFile::with_suffix(".pdx").unwrap();
+            f.write_all(&build_sample_pdx()).unwrap();
+            f
+        };
+
+        let sequence = generate_sequence::<_, &Path>(pdx_path.path(), None)
+            .expect("should build default sequence");
+        assert_eq!(sequence.step_count, 8);
     }
 }

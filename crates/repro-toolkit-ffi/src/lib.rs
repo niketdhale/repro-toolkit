@@ -20,22 +20,52 @@ use std::ffi::{c_char, CStr, CString};
 /// UTF-8 C string that remains valid for the duration of this call.
 #[no_mangle]
 pub unsafe extern "C" fn repro_toolkit_parse_pdx(path: *const c_char) -> *mut c_char {
-    if path.is_null() {
+    repro_toolkit_generate_sequence(path, std::ptr::null())
+}
+
+/// Like [`repro_toolkit_parse_pdx`], but if `sequence_path` is non-NULL it
+/// is used as a custom sequence JSON file instead of auto-generating the
+/// sequence from the PDX (see `docs/custom-sequence-guide.md`). Pass NULL
+/// for `sequence_path` to get the same behavior as
+/// [`repro_toolkit_parse_pdx`]. Returns NULL only if `pdx_path` itself is
+/// NULL.
+///
+/// # Safety
+/// `pdx_path` must be either NULL or a valid pointer to a NUL-terminated
+/// UTF-8 C string that remains valid for the duration of this call.
+/// `sequence_path` must be either NULL or likewise a valid, live,
+/// NUL-terminated UTF-8 C string pointer.
+#[no_mangle]
+pub unsafe extern "C" fn repro_toolkit_generate_sequence(
+    pdx_path: *const c_char,
+    sequence_path: *const c_char,
+) -> *mut c_char {
+    if pdx_path.is_null() {
         return std::ptr::null_mut();
     }
 
-    let path_str = match CStr::from_ptr(path).to_str() {
+    let pdx_path_str = match CStr::from_ptr(pdx_path).to_str() {
         Ok(s) => s,
-        Err(_) => return to_c_string(&error_json("path is not valid UTF-8")),
+        Err(_) => return to_c_string(&error_json("pdx_path is not valid UTF-8")),
     };
 
-    let result_json = match repro_toolkit_core::parse_pdx_file(path_str) {
-        Ok(sequence) => match repro_toolkit_core::to_json_string(&sequence) {
-            Ok(json) => format!("{{\"ok\":true,\"sequence\":{json}}}"),
-            Err(e) => error_json(&e.to_string()),
-        },
-        Err(e) => error_json(&e.to_string()),
+    let sequence_path_str = if sequence_path.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(sequence_path).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => return to_c_string(&error_json("sequence_path is not valid UTF-8")),
+        }
     };
+
+    let result_json =
+        match repro_toolkit_core::generate_sequence(pdx_path_str, sequence_path_str) {
+            Ok(sequence) => match repro_toolkit_core::to_json_string(&sequence) {
+                Ok(json) => format!("{{\"ok\":true,\"sequence\":{json}}}"),
+                Err(e) => error_json(&e.to_string()),
+            },
+            Err(e) => error_json(&e.to_string()),
+        };
 
     to_c_string(&result_json)
 }

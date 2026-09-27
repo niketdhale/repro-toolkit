@@ -2,14 +2,17 @@
 //! diagnostic services and flash data blocks parsed from a PDX archive,
 //! and defines the JSON-serializable output shape.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{ReproError, Result};
 use crate::odx::model::{DiagLayer, DiagService, FlashDataBlock, Message, ParamKind};
 
 /// The full generated repro sequence: every step a tool must execute, in
-/// order, to reprogram the ECU described by the source PDX.
-#[derive(Debug, Serialize)]
+/// order, to reprogram the ECU described by the source PDX. This type is
+/// round-trippable: the JSON it serializes to is also a valid *custom
+/// sequence* input (see [`crate::custom`]), so a generated sequence can be
+/// hand-edited and fed back in.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ReproSequence {
     pub ecu_variant: String,
     pub step_count: usize,
@@ -17,19 +20,21 @@ pub struct ReproSequence {
 }
 
 /// One request/response exchange in the sequence.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SequenceStep {
     pub index: usize,
     pub name: String,
     pub category: StepCategory,
     pub semantic: Option<String>,
     pub request: Option<MessageSpec>,
+    #[serde(default)]
     pub expected_positive_responses: Vec<MessageSpec>,
+    #[serde(default)]
     pub expected_negative_responses: Vec<MessageSpec>,
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum StepCategory {
     SessionControl,
@@ -41,29 +46,37 @@ pub enum StepCategory {
     RequestTransferExit,
     CheckMemory,
     EcuReset,
+    /// Also the default category for a custom step that doesn't declare one.
+    #[default]
     Other,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MessageSpec {
     pub name: String,
+    #[serde(default)]
     pub fields: Vec<FieldSpec>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FieldSpec {
     pub name: String,
+    #[serde(default)]
     pub byte_position: Option<u32>,
+    #[serde(default)]
     pub bit_length: Option<u32>,
     #[serde(flatten)]
     pub kind: FieldKind,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FieldKind {
     Fixed { value_hex: String },
-    Variable { data_type: Option<String> },
+    Variable {
+        #[serde(default)]
+        data_type: Option<String>,
+    },
 }
 
 /// Build the canonical repro sequence from every diagnostic layer found in

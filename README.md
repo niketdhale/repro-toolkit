@@ -34,12 +34,19 @@ repro-toolkit/
 ```
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx
 cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx -o sequence.json
+cargo run -p repro-toolkit-cli -- parse path/to/ecu.pdx --sequence my-custom-sequence.json
 ```
 
 ## Library usage (Rust)
 
 ```rust
+// Auto-generate the sequence from the PDX:
 let sequence = repro_toolkit_core::parse_pdx_file("ecu.pdx")?;
+
+// Or use a custom sequence file, falling back to the PDX-derived one when
+// `custom_sequence_path` is `None`:
+let sequence = repro_toolkit_core::generate_sequence("ecu.pdx", Some("my-custom-sequence.json"))?;
+
 let json = repro_toolkit_core::to_json_string(&sequence)?;
 ```
 
@@ -53,10 +60,11 @@ cargo build --release -p repro-toolkit-ffi
 # -> target/release/repro_toolkit_ffi.dll     (Windows)
 ```
 
-Contract: two exported functions.
+Contract: three exported functions.
 
 ```c
 char* repro_toolkit_parse_pdx(const char* path); // NUL-terminated UTF-8 JSON, or NULL if path is NULL
+char* repro_toolkit_generate_sequence(const char* pdx_path, const char* sequence_path); // sequence_path may be NULL
 void  repro_toolkit_free_string(char* ptr);      // must be called on every non-null string returned above
 ```
 
@@ -125,6 +133,21 @@ Each request/response field is either:
   `CODED-CONST` (e.g. the service ID/sub-function), given as hex, or
 - `"kind": "variable"` — a value only known at runtime (a seed, an
   address, a data payload, ...), with its ODX base data type when known.
+
+## Custom sequences
+
+If the default, auto-generated sequence isn't what you need — you want
+to insert a vendor-specific step, add a delay, reorder steps, or replace
+the whole thing — supply your own sequence as a JSON file alongside the
+PDX (`--sequence` on the CLI, the second argument to `generate_sequence`/
+`repro_toolkit_generate_sequence`). If you don't supply one, the library
+falls back to its default PDX-derived sequence, unchanged.
+
+See **[docs/custom-sequence-guide.md](docs/custom-sequence-guide.md)**
+for the full schema and recipes, and
+**[samples/custom-sequence.example.json](samples/custom-sequence.example.json)**
+for a complete worked example (the standard flash sequence with an extra
+vendor self-test step spliced in).
 
 ## Scope and limitations
 

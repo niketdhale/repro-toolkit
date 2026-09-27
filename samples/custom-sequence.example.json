@@ -1,0 +1,145 @@
+{
+  "ecu_variant": "Sample_ECU",
+  "steps": [
+    {
+      "name": "DiagnosticSessionControl_Programming",
+      "category": "SESSION_CONTROL",
+      "semantic": "SESSION",
+      "request": {
+        "name": "DSC_Programming_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "10" },
+          { "name": "SubFunction", "byte_position": 1, "bit_length": 8, "kind": "fixed", "value_hex": "02" }
+        ]
+      },
+      "expected_positive_responses": [
+        {
+          "name": "DSC_Programming_PosRsp",
+          "fields": [
+            { "name": "ResponseSID", "byte_position": 0, "kind": "variable", "data_type": "A_UINT32" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PowerSettleDelay",
+      "notes": "Vendor requires a 500ms settle delay after entering the programming session, before requesting security access. This tool has no built-in concept of a delay step, so it's expressed as an OTHER step that carries only a note for the flashing tool to act on."
+    },
+    {
+      "name": "SecurityAccess_RequestSeed",
+      "category": "SECURITY_SEED_REQUEST",
+      "semantic": "SECURITY",
+      "request": {
+        "name": "RequestSeed_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "27" }
+        ]
+      },
+      "expected_positive_responses": [
+        {
+          "name": "RequestSeed_PosRsp",
+          "fields": [
+            { "name": "Seed", "byte_position": 2, "kind": "variable", "data_type": "A_BYTEFIELD" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SecurityAccess_SendKey",
+      "category": "SECURITY_KEY_SEND",
+      "semantic": "SECURITY",
+      "request": {
+        "name": "SendKey_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "27" },
+          { "name": "Key", "byte_position": 2, "kind": "variable", "data_type": "A_BYTEFIELD" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "SendKey_PosRsp", "fields": [] }
+      ]
+    },
+    {
+      "name": "VendorPreFlashSelfTest",
+      "category": "OTHER",
+      "notes": "Custom step with no PDX/ODX origin: an OEM-specific RoutineControl the vendor's own flash procedure requires before RequestDownload, spliced in between the standard security-access and download steps.",
+      "request": {
+        "name": "VendorPreFlashSelfTest_Req",
+        "fields": [
+          { "name": "SID", "kind": "fixed", "value_hex": "31" },
+          { "name": "RoutineControlType", "kind": "fixed", "value_hex": "01" },
+          { "name": "RoutineIdentifier", "kind": "fixed", "value_hex": "F0F0" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "VendorPreFlashSelfTest_PosRsp", "fields": [] }
+      ],
+      "expected_negative_responses": [
+        {
+          "name": "VendorPreFlashSelfTest_NegRsp",
+          "fields": [
+            { "name": "NegativeResponseCode", "kind": "variable", "data_type": "A_UINT32" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RequestDownload",
+      "category": "REQUEST_DOWNLOAD",
+      "semantic": "FLASH",
+      "request": {
+        "name": "RequestDownload_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "34" },
+          { "name": "MemoryAddress", "byte_position": 2, "kind": "variable", "data_type": "A_UINT32" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "RequestDownload_PosRsp", "fields": [] }
+      ]
+    },
+    {
+      "name": "TransferData",
+      "category": "TRANSFER_DATA",
+      "semantic": "FLASH",
+      "request": {
+        "name": "TransferData_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "36" },
+          { "name": "BlockData", "byte_position": 2, "kind": "variable", "data_type": "A_BYTEFIELD" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "TransferData_PosRsp", "fields": [] }
+      ]
+    },
+    {
+      "name": "RequestTransferExit",
+      "category": "REQUEST_TRANSFER_EXIT",
+      "semantic": "FLASH",
+      "request": {
+        "name": "RequestTransferExit_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "37" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "RequestTransferExit_PosRsp", "fields": [] }
+      ]
+    },
+    {
+      "name": "ECUReset_Hard",
+      "category": "ECU_RESET",
+      "semantic": "RESET",
+      "request": {
+        "name": "ECUReset_Req",
+        "fields": [
+          { "name": "SID", "byte_position": 0, "bit_length": 8, "kind": "fixed", "value_hex": "11" }
+        ]
+      },
+      "expected_positive_responses": [
+        { "name": "ECUReset_PosRsp", "fields": [] }
+      ]
+    }
+  ]
+}
