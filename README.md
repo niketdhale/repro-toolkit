@@ -27,6 +27,9 @@ repro-toolkit/
     repro-toolkit-core/   # library: PDX/ODX parsing, sequence builder, JSON output
     repro-toolkit-ffi/    # cdylib/staticlib: C ABI wrapper over core
     repro-toolkit-cli/    # binary: `repro-toolkit parse <file.pdx>`
+  examples/               # one example per language: C, C++, Python, C#, Rust
+  samples/                # sample.pdx and a worked custom-sequence.example.json
+  docs/                   # custom-sequence-guide.md
 ```
 
 ## CLI usage
@@ -151,6 +154,13 @@ Each request/response field is either:
   `CODED-CONST` (e.g. the service ID/sub-function), given as hex, or
 - `"kind": "variable"` — a value only known at runtime (a seed, an
   address, a data payload, ...), with its ODX base data type when known.
+
+## Examples
+
+Runnable examples for C, C++, Python, C#, and Rust live in
+[`examples/`](examples), each calling this library against the same
+sample PDX. See [`examples/README.md`](examples/README.md) to get
+started.
 
 ## Custom sequences
 

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ReproToolkit.Interop</RootNamespace>
+    <AssemblyName>ReproToolkit.Interop</AssemblyName>
+    <Description>Managed P/Invoke wrapper over repro-toolkit-ffi's native C ABI.</Description>
+  </PropertyGroup>
+
+</Project>
