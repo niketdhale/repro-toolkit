@@ -1,0 +1,16 @@
+[package]
+name = "repro-toolkit-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Parses automotive PDX/ODX diagnostic containers and generates UDS ECU reprogramming (repro) sequences."
+
+[dependencies]
+zip = { version = "2", default-features = false, features = ["deflate"] }
+roxmltree = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"

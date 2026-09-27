@@ -1,0 +1,14 @@
+[package]
+name = "repro-toolkit-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI: parse a PDX file and print/write its UDS repro sequence as JSON."
+
+[[bin]]
+name = "repro-toolkit"
+path = "src/main.rs"
+
+[dependencies]
+repro-toolkit-core = { path = "../repro-toolkit-core" }
+clap = { version = "4", features = ["derive"] }
