@@ -8,7 +8,7 @@ Security fixes go into the latest release only.
 
 Please do **not** report security problems in a public issue. Report them privately
 instead, through GitHub's "Report a vulnerability" button on the repository's
-**Security** tab, or by email to niketdhale12@gmail.com.
+**Security** tab.
 
 Include the affected version, a description of the problem, and a minimal way to
 reproduce it (for example, a crafted PDX/ODX snippet). You should get an initial
