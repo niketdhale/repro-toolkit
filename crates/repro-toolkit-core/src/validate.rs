@@ -191,6 +191,7 @@ mod tests {
             name: name.to_string(),
             byte_position,
             bit_length,
+            description: None,
             kind,
         }
     }

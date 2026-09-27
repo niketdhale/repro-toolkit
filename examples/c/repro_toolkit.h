@@ -9,6 +9,8 @@
 #ifndef REPRO_TOOLKIT_H
 #define REPRO_TOOLKIT_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,6 +32,14 @@ char *repro_toolkit_generate_sequence(const char *pdx_path, const char *sequence
  * {"ok": false, "error": "..."} on failure. Returns NULL only if
  * `pdx_path` itself is NULL. */
 char *repro_toolkit_validate_sequence(const char *pdx_path, const char *sequence_path);
+
+/* Same as the two functions above, but with an explicit TransferData
+ * max_block_length (UDS maxNumberOfBlockLength, including the SID and
+ * block sequence counter bytes). Pass 0 for the default (0x0FFF). */
+char *repro_toolkit_generate_sequence_ex(const char *pdx_path, const char *sequence_path,
+                                         uint32_t max_block_length);
+char *repro_toolkit_validate_sequence_ex(const char *pdx_path, const char *sequence_path,
+                                         uint32_t max_block_length);
 
 /* Frees a string previously returned by any repro_toolkit_* function.
  * Passing NULL is a no-op. */
